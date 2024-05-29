@@ -158,6 +158,10 @@ int main(int argc, char** argv) {
         }
 
         secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+        if (ctx == nullptr) {
+            std::cerr << "Failed to create secp256k1 context" << std::endl;
+            return 1;
+        }
 
         secp256k1_pubkey pubkey;
         if (!secp256k1_ec_pubkey_create(ctx, &pubkey, privKey.data())) {
@@ -169,10 +173,15 @@ int main(int argc, char** argv) {
 
         unsigned char pubkeyCompressed[33];
         size_t outputLength = 33;
-        secp256k1_ec_pubkey_serialize(ctx, pubkeyCompressed, &outputLength, &pubkey, SECP256K1_EC_COMPRESSED);
+        if (!secp256k1_ec_pubkey_serialize(ctx, pubkeyCompressed, &outputLength, &pubkey, SECP256K1_EC_COMPRESSED)) {
+            std::cerr << "Failed to serialize public key" << std::endl;
+            secp256k1_context_destroy(ctx);
+            mpz_add_ui(i, i, 1);
+            continue;
+        }
 
         unsigned char sha256Digest[SHA256_DIGEST_LENGTH];
-        SHA256(pubkeyCompressed, 33, sha256Digest);
+        SHA256(pubkeyCompressed, outputLength, sha256Digest);
 
         unsigned char ripemd160Digest[RIPEMD160_DIGEST_LENGTH];
         RIPEMD160_hash(sha256Digest, SHA256_DIGEST_LENGTH, ripemd160Digest);
