@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iomanip>
 #include <openssl/sha.h>
+#include <openssl/evp.h>
 #include <openssl/ripemd.h>
 #include <secp256k1.h>
 #include <openssl/bn.h>
@@ -92,6 +93,16 @@ std::string toBase58Check(const std::vector<unsigned char>& data) {
     return std::string(base58Encoded.begin(), base58Encoded.end());
 }
 
+// Fungsi baru untuk melakukan hash RIPEMD160 menggunakan EVP
+void RIPEMD160_hash(const unsigned char* input, size_t length, unsigned char* output) {
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    const EVP_MD* md = EVP_ripemd160();
+    EVP_DigestInit_ex(ctx, md, nullptr);
+    EVP_DigestUpdate(ctx, input, length);
+    EVP_DigestFinal_ex(ctx, output, nullptr);
+    EVP_MD_CTX_free(ctx);
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <number_of_patterns>" << std::endl;
@@ -158,7 +169,7 @@ int main(int argc, char** argv) {
         SHA256(pubkeyCompressed, 33, sha256Digest);
 
         unsigned char ripemd160Digest[RIPEMD160_DIGEST_LENGTH];
-        RIPEMD160(sha256Digest, SHA256_DIGEST_LENGTH, ripemd160Digest);
+        RIPEMD160_hash(sha256Digest, SHA256_DIGEST_LENGTH, ripemd160Digest);
 
         std::vector<unsigned char> extendedRipemd160(21);
         extendedRipemd160[0] = 0x00;
