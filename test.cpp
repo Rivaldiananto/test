@@ -10,6 +10,7 @@
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <secp256k1.h>
+#include <openssl/bn.h>
 #include <algorithm>
 
 // Fungsi untuk mengonversi integer ke string biner 6-bit
