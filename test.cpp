@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <sstream>
 #include <iomanip>
-#include <bitcoin/bitcoin.hpp> // Include libbitcoin for Bitcoin address generation
 
 // Fungsi untuk mengonversi integer ke string biner 6-bit
 std::string intToBinary6(int num) {
@@ -34,19 +33,6 @@ std::string binaryToHex(const std::string &binaryStr) {
     free(hex_cstr);
     mpz_clear(num);
     return hex_str;
-}
-
-// Fungsi untuk mengonversi hex ke alamat Bitcoin
-std::string hex_to_bitcoin_address(const std::string& hex) {
-    // Convert hex string to binary data
-    bc::data_chunk pubkey_data;
-    bc::decode_base16(pubkey_data, hex);
-
-    // Generate Bitcoin address
-    bc::wallet::payment_address address = bc::wallet::ec_public(pubkey_data).to_payment_address(
-        bc::wallet::payment_address::mainnet_p2kh);
-
-    return address.encoded();
 }
 
 int main(int argc, char** argv) {
@@ -84,8 +70,8 @@ int main(int argc, char** argv) {
             combination /= 64;
         }
         std::string hexResult = binaryToHex(result);  // Konversi ke heksadesimal
-        std::string bitcoinAddress = hex_to_bitcoin_address(hexResult);  // Menghasilkan alamat Bitcoin
-        std::cout << "Hex: " << hexResult << " -> BTC Address: " << bitcoinAddress << std::endl;
+        // Tampilkan atau proses hasil hex
+        std::cout << hexResult << std::endl;
         mpz_add_ui(i, i, 1);
         count++;
     }
