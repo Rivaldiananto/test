@@ -13,6 +13,7 @@
 #include <secp256k1.h>
 #include <openssl/bn.h>
 #include <algorithm>
+#include <random>
 
 // Fungsi untuk mengonversi integer ke string biner 6-bit
 std::string intToBinary6(int num) {
@@ -109,6 +110,20 @@ void RIPEMD160_hash(const unsigned char* input, size_t length, unsigned char* ou
     EVP_MD_CTX_free(ctx);
 }
 
+// Fungsi untuk menghasilkan kunci privat acak yang valid
+std::vector<unsigned char> generateRandomPrivateKey() {
+    std::vector<unsigned char> privKey(32);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 255);
+
+    for (int i = 0; i < 32; ++i) {
+        privKey[i] = dis(gen);
+    }
+
+    return privKey;
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <number_of_patterns>" << std::endl;
@@ -148,14 +163,7 @@ int main(int argc, char** argv) {
         std::cout << "Hex result: " << hexResult << std::endl;
 
         // Mengubah hexResult menjadi BTC address terkompresi
-        std::vector<unsigned char> privKey;
-        hexToBytes(hexResult, privKey);
-
-        if (privKey.size() != 32) {
-            std::cerr << "Invalid private key length: " << privKey.size() << std::endl;
-            mpz_add_ui(i, i, 1);
-            continue;
-        }
+        std::vector<unsigned char> privKey = generateRandomPrivateKey();
 
         secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
         if (ctx == nullptr) {
