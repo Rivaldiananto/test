@@ -38,6 +38,12 @@ std::string binaryToHex(const std::string &binaryStr) {
     std::string hex_str(hex_cstr);
     free(hex_cstr);
     mpz_clear(num);
+    
+    // Ensure the hex string is 64 characters long
+    if (hex_str.length() < 64) {
+        hex_str.insert(0, 64 - hex_str.length(), '0');
+    }
+    
     return hex_str;
 }
 
