@@ -1,5 +1,5 @@
+#include <openssl/evp.h>
 #include <openssl/ec.h>
-#include <openssl/obj_mac.h>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <iostream>
@@ -7,7 +7,7 @@
 #include <sstream>
 #include <vector>
 
-std::string to_hex(unsigned char* str, int len) {
+std::string to_hex(const unsigned char* str, int len) {
     std::stringstream ss;
     ss << std::hex;
     for (int i = 0; i < len; ++i)
@@ -28,7 +28,7 @@ std::string base58_encode(const std::vector<unsigned char>& data) {
             carry /= 58;
         }
         while (carry) {
-            result.push_back(chars[carry % 58];
+            result.push_back(chars[carry % 58]);
             carry /= 58;
         }
     }
@@ -43,24 +43,31 @@ int main(int argc, char* argv[]) {
 
     // Mengambil hexadecimal private key dari argumen baris perintah
     std::string hex_private_key = argv[1];
+    const char* curve_name = "secp256k1";
 
-    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
-    BIGNUM* prv = BN_new();
-    BN_hex2bn(&prv, hex_private_key.c_str());
-    EC_KEY_set_private_key(key, prv);
+    // Setup
+    EVP_PKEY_CTX* pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+    EVP_PKEY_paramgen_init(pctx);
+    EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, OBJ_sn2nid(curve_name));
+    EVP_PKEY* params = NULL;
+    EVP_PKEY_paramgen(pctx, &params);
+    EVP_PKEY_CTX* kctx = EVP_PKEY_CTX_new(params, NULL);
+    EVP_PKEY_keygen_init(kctx);
+    
+    // Generate key
+    EVP_PKEY* pkey = NULL;
+    EVP_PKEY_keygen(kctx, &pkey);
 
-    // Generate public key
-    EC_POINT* pub = EC_POINT_new(EC_KEY_get0_group(key));
-    EC_POINT_mul(EC_KEY_get0_group(key), pub, prv, NULL, NULL, NULL);
-    EC_KEY_set_public_key(key, pub);
-
-    // Get public key data
-    unsigned char pub_key[65];
-    EC_POINT_point2oct(EC_KEY_get0_group(key), pub, POINT_CONVERSION_UNCOMPRESSED, pub_key, 65, NULL);
+    // Derive public key
+    unsigned char* pub_key;
+    size_t pub_key_len;
+    EVP_PKEY_get_raw_public_key(pkey, NULL, &pub_key_len);
+    pub_key = (unsigned char*)OPENSSL_malloc(pub_key_len);
+    EVP_PKEY_get_raw_public_key(pkey, pub_key, &pub_key_len);
 
     // SHA-256
     unsigned char sha256_result[SHA256_DIGEST_LENGTH];
-    SHA256(pub_key, sizeof(pub_key), sha256_result);
+    SHA256(pub_key, pub_key_len, sha256_result);
 
     // RIPEMD-160
     unsigned char ripemd_result[RIPEMD160_DIGEST_LENGTH];
@@ -74,9 +81,11 @@ int main(int argc, char* argv[]) {
     std::cout << "Bitcoin Address: " << btc_address << std::endl;
 
     // Cleanup
-    EC_KEY_free(key);
-    BN_free(prv);
-    EC_POINT_free(pub);
+    OPENSSL_free(pub_key);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_free(params);
+    EVP_PKEY_CTX_free(pctx);
+    EVP_PKEY_CTX_free(kctx);
 
     return 0;
 }
