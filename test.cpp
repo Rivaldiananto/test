@@ -143,12 +143,27 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                     unique_solutions.insert(hex_val);
 
                     std::vector<unsigned char> private_key_bytes(hex_val.begin(), hex_val.end());
-                    EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-                    EC_KEY_generate_key(eckey);
+                    // Gantilah penggunaan fungsi OpenSSL yang usang dengan API yang baru
+                    EC_KEY *eckey = EC_KEY_new();
+                    EC_GROUP *ecgroup = EC_GROUP_new_by_curve_name(NID_secp256k1);
+                    EC_KEY_set_group(eckey, ecgroup);
+
+                    if (!EC_KEY_generate_key(eckey)) {
+                        std::cerr << "Error generating EC key" << std::endl;
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
+                        return;
+                    }
 
                     const EC_POINT *pub_key_point = EC_KEY_get0_public_key(eckey);
                     BIGNUM *pub_key_bn = BN_new();
-                    EC_POINT_point2bn(EC_KEY_get0_group(eckey), pub_key_point, POINT_CONVERSION_COMPRESSED, pub_key_bn, NULL);
+                    if (!EC_POINT_point2bn(ecgroup, pub_key_point, POINT_CONVERSION_COMPRESSED, pub_key_bn, NULL)) {
+                        std::cerr << "Error converting public key to BIGNUM" << std::endl;
+                        BN_free(pub_key_bn);
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
+                        return;
+                    }
                     std::vector<unsigned char> pub_key(BN_num_bytes(pub_key_bn));
                     BN_bn2bin(pub_key_bn, pub_key.data());
 
@@ -157,10 +172,14 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                     if (std::find(target_addresses.begin(), target_addresses.end(), btc_address) != target_addresses.end()) {
                         std::cout << "Match found! BTC Address: " << btc_address << " for hex value: " << hex_val << std::endl;
                         found_event.store(true);
+                        BN_free(pub_key_bn);
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
                         break;
                     }
 
                     BN_free(pub_key_bn);
+                    EC_GROUP_free(ecgroup);
                     EC_KEY_free(eckey);
                 }
             }
