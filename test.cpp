@@ -4,10 +4,11 @@
 #include <mutex>
 #include <unordered_set>
 #include <atomic>
+#include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <openssl/ec.h>
-#include <openssl/obj_mac.h>
+#include <openssl/objects.h>
 #include <openssl/bn.h>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <nlopt.hpp>
@@ -63,7 +64,11 @@ std::string pubkey_to_address(const std::vector<unsigned char>& pubkey) {
     SHA256(pubkey.data(), pubkey.size(), sha256_1);
 
     unsigned char ripemd160[RIPEMD160_DIGEST_LENGTH];
-    RIPEMD160(sha256_1, SHA256_DIGEST_LENGTH, ripemd160);
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(mdctx, EVP_ripemd160(), NULL);
+    EVP_DigestUpdate(mdctx, sha256_1, SHA256_DIGEST_LENGTH);
+    EVP_DigestFinal_ex(mdctx, ripemd160, NULL);
+    EVP_MD_CTX_free(mdctx);
 
     std::vector<unsigned char> hashed_pubkey_with_prefix(1 + RIPEMD160_DIGEST_LENGTH);
     hashed_pubkey_with_prefix[0] = 0x00; // versi mainnet
@@ -104,8 +109,9 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
     opt.set_min_objective(objective_function, &total_value_new);
     opt.set_xtol_rel(1e-10);
 
+    std::vector<double> x = {2.5, 2.5};  // Setel nilai awal dalam batasan yang sah
+
     while (!found_event.load()) {
-        std::vector<double> x(2);
         double minf;
         nlopt::result result = opt.optimize(x, minf);
         
