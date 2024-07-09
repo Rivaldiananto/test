@@ -145,25 +145,56 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                     std::vector<unsigned char> private_key_bytes(hex_val.begin(), hex_val.end());
                     // Gantilah penggunaan fungsi OpenSSL yang usang dengan API yang baru
                     EC_KEY *eckey = EC_KEY_new();
-                    EC_GROUP *ecgroup = EC_GROUP_new_by_curve_name(NID_secp256k1);
-                    EC_KEY_set_group(eckey, ecgroup);
+                    if (!eckey) {
+                        std::cerr << "Failed to create new EC_KEY" << std::endl;
+                        continue;
+                    }
 
-                    if (!EC_KEY_generate_key(eckey)) {
-                        std::cerr << "Error generating EC key" << std::endl;
+                    EC_GROUP *ecgroup = EC_GROUP_new_by_curve_name(NID_secp256k1);
+                    if (!ecgroup) {
+                        std::cerr << "Failed to create new EC_GROUP" << std::endl;
+                        EC_KEY_free(eckey);
+                        continue;
+                    }
+
+                    if (EC_KEY_set_group(eckey, ecgroup) == 0) {
+                        std::cerr << "Failed to set group for EC_KEY" << std::endl;
                         EC_GROUP_free(ecgroup);
                         EC_KEY_free(eckey);
-                        return;
+                        continue;
+                    }
+
+                    if (EC_KEY_generate_key(eckey) == 0) {
+                        std::cerr << "Failed to generate EC key" << std::endl;
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
+                        continue;
                     }
 
                     const EC_POINT *pub_key_point = EC_KEY_get0_public_key(eckey);
+                    if (!pub_key_point) {
+                        std::cerr << "Failed to get public key point" << std::endl;
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
+                        continue;
+                    }
+
                     BIGNUM *pub_key_bn = BN_new();
+                    if (!pub_key_bn) {
+                        std::cerr << "Failed to create new BIGNUM" << std::endl;
+                        EC_GROUP_free(ecgroup);
+                        EC_KEY_free(eckey);
+                        continue;
+                    }
+
                     if (!EC_POINT_point2bn(ecgroup, pub_key_point, POINT_CONVERSION_COMPRESSED, pub_key_bn, NULL)) {
                         std::cerr << "Error converting public key to BIGNUM" << std::endl;
                         BN_free(pub_key_bn);
                         EC_GROUP_free(ecgroup);
                         EC_KEY_free(eckey);
-                        return;
+                        continue;
                     }
+
                     std::vector<unsigned char> pub_key(BN_num_bytes(pub_key_bn));
                     BN_bn2bin(pub_key_bn, pub_key.data());
 
