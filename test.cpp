@@ -13,10 +13,8 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <nlopt.hpp>
 
-// Pustaka untuk Base58 encoding perlu ditambahkan atau diimplementasikan
 const char* BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-// Fungsi Base58 encoding
 std::string base58_encode(const std::vector<unsigned char>& input) {
     std::vector<unsigned char> temp(input.size() * 2);
     std::string result;
@@ -58,7 +56,6 @@ std::string base58_encode(const std::vector<unsigned char>& input) {
     return result;
 }
 
-// Fungsi untuk konversi public key menjadi BTC address
 std::string pubkey_to_address(const std::vector<unsigned char>& pubkey) {
     unsigned char sha256_1[SHA256_DIGEST_LENGTH];
     SHA256(pubkey.data(), pubkey.size(), sha256_1);
@@ -71,7 +68,7 @@ std::string pubkey_to_address(const std::vector<unsigned char>& pubkey) {
     EVP_MD_CTX_free(mdctx);
 
     std::vector<unsigned char> hashed_pubkey_with_prefix(1 + RIPEMD160_DIGEST_LENGTH);
-    hashed_pubkey_with_prefix[0] = 0x00; // versi mainnet
+    hashed_pubkey_with_prefix[0] = 0x00;
     std::copy(ripemd160, ripemd160 + RIPEMD160_DIGEST_LENGTH, hashed_pubkey_with_prefix.begin() + 1);
 
     unsigned char sha256_2[SHA256_DIGEST_LENGTH];
@@ -86,7 +83,6 @@ std::string pubkey_to_address(const std::vector<unsigned char>& pubkey) {
     return address;
 }
 
-// Fungsi objektif untuk optimasi
 double objective_function(const std::vector<double> &x, std::vector<double> &grad, void *total_value_new) {
     double total_value = *reinterpret_cast<double*>(total_value_new);
     double sum_x = 0.0;
@@ -96,7 +92,6 @@ double objective_function(const std::vector<double> &x, std::vector<double> &gra
     return std::abs(sum_x - total_value);
 }
 
-// Fungsi utama untuk menemukan solusi
 void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex& solutions_lock, const std::vector<std::string>& target_addresses, std::atomic<bool>& found_event) {
     double total_value_new = 4.7931547296039625;
     std::vector<std::pair<double, double>> bounds = { {2.2, 2.8}, {2.2, 2.8} };
@@ -109,12 +104,18 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
     opt.set_min_objective(objective_function, &total_value_new);
     opt.set_xtol_rel(1e-10);
 
-    std::vector<double> x = {2.5, 2.5};  // Setel nilai awal dalam batasan yang sah
+    std::vector<double> x = {2.5, 2.5};
 
     while (!found_event.load()) {
         double minf;
         nlopt::result result = opt.optimize(x, minf);
-        
+        std::cout << "Optimization result: " << result << std::endl;
+        std::cout << "Optimized values: ";
+        for (auto val : x) {
+            std::cout << val << " ";
+        }
+        std::cout << std::endl;
+
         if (result == nlopt::SUCCESS) {
             std::vector<boost::multiprecision::cpp_dec_float_50> optimal_values_new;
             for (auto val : x) {
@@ -143,13 +144,14 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                     unique_solutions.insert(hex_val);
 
                     std::vector<unsigned char> private_key_bytes(hex_val.begin(), hex_val.end());
-                    // Gantilah penggunaan fungsi OpenSSL yang usang dengan API yang baru
+                    std::cout << "Creating EC_KEY" << std::endl;
                     EC_KEY *eckey = EC_KEY_new();
                     if (!eckey) {
                         std::cerr << "Failed to create new EC_KEY" << std::endl;
                         continue;
                     }
 
+                    std::cout << "Creating EC_GROUP" << std::endl;
                     EC_GROUP *ecgroup = EC_GROUP_new_by_curve_name(NID_secp256k1);
                     if (!ecgroup) {
                         std::cerr << "Failed to create new EC_GROUP" << std::endl;
@@ -157,6 +159,7 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                         continue;
                     }
 
+                    std::cout << "Setting group for EC_KEY" << std::endl;
                     if (EC_KEY_set_group(eckey, ecgroup) == 0) {
                         std::cerr << "Failed to set group for EC_KEY" << std::endl;
                         EC_GROUP_free(ecgroup);
@@ -164,6 +167,7 @@ void find_solution(std::unordered_set<std::string>& unique_solutions, std::mutex
                         continue;
                     }
 
+                    std::cout << "Generating EC key" << std::endl;
                     if (EC_KEY_generate_key(eckey) == 0) {
                         std::cerr << "Failed to generate EC key" << std::endl;
                         EC_GROUP_free(ecgroup);
